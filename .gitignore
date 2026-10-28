@@ -1,0 +1,16 @@
+# Database SQLite locale (contiene credenziali utenti e ticket personali)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# macOS
+.DS_Store
+
+# Variabili d'ambiente
+.env

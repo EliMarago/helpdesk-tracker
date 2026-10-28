@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Help Desk Console — Task & SLA Giornaliero</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+  <!-- AUTHENTICATION GATE (LOGIN & REGISTER) -->
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-top-bar">
+      <button id="authThemeToggleBtn" class="btn btn-secondary btn-sm" title="Cambia tema Chiaro/Scuro">
+        <span id="authThemeIcon">☀️</span> <span id="authThemeLabel">Light Mode</span>
+      </button>
+    </div>
+
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+          </svg>
+        </div>
+        <div>
+          <h2>Help Desk Console</h2>
+          <p>Accesso Operatore &amp; Gestione Ticket Giornalieri</p>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button type="button" id="tabLoginBtn" class="auth-tab active">Accedi</button>
+        <button type="button" id="tabRegisterBtn" class="auth-tab">Crea Account</button>
+      </div>
+
+      <div id="authErrorBox" class="auth-error hidden"></div>
+
+      <!-- LOGIN FORM -->
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label for="loginEmail">Email Operatore</label>
+          <input type="email" id="loginEmail" required placeholder="nome@azienda.it" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit-btn">Entra nella Console</button>
+      </form>
+
+      <!-- REGISTER FORM -->
+      <form id="registerForm" class="auth-form hidden">
+        <div class="form-group">
+          <label for="regName">Nome e Cognome</label>
+          <input type="text" id="regName" required placeholder="es. Elisabetta Rossi" autocomplete="name" />
+        </div>
+        <div class="form-group">
+          <label for="regRole">Ruolo / Livello Supporto</label>
+          <select id="regRole">
+            <option value="Help Desk L1">Help Desk L1 (Primo Livello)</option>
+            <option value="Help Desk L2">Help Desk L2 (Secondo Livello)</option>
+            <option value="System Administrator">System Administrator / L3</option>
+            <option value="Service Desk Manager">Service Desk Manager</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="regEmail">Email Aziendale</label>
+          <input type="email" id="regEmail" required placeholder="nome@azienda.it" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label for="regPassword">Password (min. 4 caratteri)</label>
+          <input type="password" id="regPassword" required minlength="4" placeholder="••••••••" autocomplete="new-password" />
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit-btn">Registra e Accedi</button>
+      </form>
+
+      <div class="auth-footer-note">
+        🔒 Credenziali cifrate con PBKDF2-SHA256 e salvate nel database locale SQLite (<code>helpdesk.db</code>).
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APPLICATION SHELL -->
+  <div id="appShell" class="app-shell hidden">
+    <!-- TOP HEADER -->
+    <header class="top-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>Help Desk Console</h1>
+          <p class="subtitle">Monitoraggio Ticket, SLA &amp; Timesheet Giornaliero</p>
+        </div>
+      </div>
+
+      <!-- ACTIVE TIMER BANNER IN HEADER -->
+      <div id="activeTimerBanner" class="active-timer-banner hidden">
+        <span class="pulse-dot"></span>
+        <div class="active-timer-info">
+          <span class="active-timer-label">In lavorazione:</span>
+          <strong id="activeTimerTicket">INC-0000</strong>
+          <span id="activeTimerClock" class="mono-clock">00:00:00</span>
+        </div>
+        <button id="stopActiveTimerBtn" class="btn btn-xs btn-danger" title="Ferma cronometro">Pausa</button>
+      </div>
+
+      <div class="header-actions">
+        <div class="date-selector-wrap">
+          <label for="workDateInput">Giornata:</label>
+          <input type="date" id="workDateInput" class="input-date" />
+          <label class="carryover-toggle" title="Mostra anche i ticket aperti nei giorni scorsi non ancora risolti">
+            <input type="checkbox" id="carryoverToggle" checked />
+            <span>Arretrati aperti</span>
+          </label>
+        </div>
+
+        <button id="openTemplatesBtn" class="btn btn-secondary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Risposte Rapide
+        </button>
+
+        <button id="openReportBtn" class="btn btn-secondary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          Report Fine Turno
+        </button>
+
+        <button id="newTaskBtn" class="btn btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Nuovo Ticket <kbd>N</kbd>
+        </button>
+
+        <!-- THEME TOGGLE BUTTON -->
+        <button id="themeToggleBtn" class="btn btn-secondary btn-icon-text" title="Passa a Light / Dark Mode">
+          <span id="themeIcon">☀️</span>
+          <span id="themeLabel">Light</span>
+        </button>
+
+        <!-- USER PROFILE & LOGOUT -->
+        <div class="user-profile-pill">
+          <div class="user-avatar" id="userAvatar">OP</div>
+          <div class="user-info">
+            <span class="user-name" id="userNameDisplay">Operatore</span>
+            <span class="user-role" id="userRoleDisplay">Help Desk</span>
+          </div>
+          <button id="logoutBtn" class="btn-icon btn-danger-ghost" title="Disconnetti (Logout)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI SUMMARY BAR -->
+    <section class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Ticket Totali</div>
+        <div class="kpi-value" id="kpiTotal">0</div>
+        <div class="kpi-sub" id="kpiOpenSub">0 aperti</div>
+      </div>
+      <div class="kpi-card kpi-Progress">
+        <div class="kpi-label">In Lavorazione / Attesa</div>
+        <div class="kpi-value" id="kpiActive">0</div>
+        <div class="kpi-sub" id="kpiWaitingSub">0 in attesa utente</div>
+      </div>
+      <div class="kpi-card kpi-sla">
+        <div class="kpi-label">Allerta SLA (&lt; 30m / Scaduti)</div>
+        <div class="kpi-value" id="kpiSlaAlert">0</div>
+        <div class="kpi-sub" id="kpiSlaBreached">0 fuori SLA</div>
+      </div>
+      <div class="kpi-card kpi-resolved">
+        <div class="kpi-label">Risolti Oggi</div>
+        <div class="kpi-value" id="kpiResolved">0</div>
+        <div class="kpi-sub" id="kpiResolutionRate">0% completamento</div>
+      </div>
+      <div class="kpi-card kpi-time">
+        <div class="kpi-label">Tempo Tracciato</div>
+        <div class="kpi-value mono-clock" id="kpiTimeSpent">00:00:00</div>
+        <div class="kpi-sub">Totale lavorato sui ticket</div>
+      </div>
+    </section>
+
+    <!-- TOOLBAR: FILTERS & VIEW SWITCHER -->
+    <section class="toolbar">
+      <div class="filters-group">
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="searchInput" placeholder="Cerca per #ID ticket, titolo, utente, reparto..." />
+        </div>
+
+        <select id="filterPriority" class="select-filter">
+          <option value="ALL">Tutte le Priorità</option>
+          <option value="P1">🔥 P1 - Critico (SLA 1h)</option>
+          <option value="P2">⚡ P2 - Alto (SLA 4h)</option>
+          <option value="P3">📌 P3 - Normale (SLA 8h)</option>
+          <option value="P4">🌱 P4 - Basso (SLA 24h)</option>
+        </select>
+
+        <select id="filterCategory" class="select-filter">
+          <option value="ALL">Tutte le Categorie</option>
+          <option value="Hardware">💻 Hardware</option>
+          <option value="Software">🧩 Software / ERP</option>
+          <option value="Rete">🌐 Rete / VPN</option>
+          <option value="Account">🔐 Account / AD</option>
+          <option value="Altro">📋 Altro</option>
+        </select>
+      </div>
+
+      <div class="view-switcher">
+        <button class="view-btn active" data-view="kanban" id="viewKanbanBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18" rx="1"></rect><rect x="10" y="3" width="5" height="12" rx="1"></rect><rect x="17" y="3" width="5" height="15" rx="1"></rect></svg>
+          Vista Kanban
+        </button>
+        <button class="view-btn" data-view="list" id="viewListBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          Vista Tabella
+        </button>
+      </div>
+    </section>
+
+    <!-- MAIN WORKSPACE: KANBAN OR TABLE -->
+    <main class="main-workspace">
+      <!-- KANBAN VIEW -->
+      <div id="kanbanView" class="kanban-board">
+        <div class="kanban-col" data-status="todo">
+          <div class="kanban-col-header">
+            <div class="col-title">
+              <span class="status-dot dot-todo"></span>
+              <h2>Da Fare</h2>
+            </div>
+            <span class="col-count" id="count-todo">0</span>
+          </div>
+          <div class="kanban-cards" id="col-todo"></div>
+        </div>
+
+        <div class="kanban-col" data-status="in_progress">
+          <div class="kanban-col-header">
+            <div class="col-title">
+              <span class="status-dot dot-progress"></span>
+              <h2>In Lavorazione</h2>
+            </div>
+            <span class="col-count" id="count-in_progress">0</span>
+          </div>
+          <div class="kanban-cards" id="col-in_progress"></div>
+        </div>
+
+        <div class="kanban-col" data-status="waiting">
+          <div class="kanban-col-header">
+            <div class="col-title">
+              <span class="status-dot dot-waiting"></span>
+              <h2>In Attesa Utente/Fornitore</h2>
+            </div>
+            <span class="col-count" id="count-waiting">0</span>
+          </div>
+          <div class="kanban-cards" id="col-waiting"></div>
+        </div>
+
+        <div class="kanban-col" data-status="resolved">
+          <div class="kanban-col-header">
+            <div class="col-title">
+              <span class="status-dot dot-resolved"></span>
+              <h2>Risolti / Chiusi</h2>
+            </div>
+            <span class="col-count" id="count-resolved">0</span>
+          </div>
+          <div class="kanban-cards" id="col-resolved"></div>
+        </div>
+      </div>
+
+      <!-- LIST / TABLE VIEW -->
+      <div id="listView" class="list-view hidden">
+        <table class="tasks-table">
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Priorità</th>
+              <th>Titolo &amp; Categoria</th>
+              <th>Utente / Reparto</th>
+              <th>Stato</th>
+              <th>Scadenza SLA</th>
+              <th>Tempo Speso</th>
+              <th>Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="listTableBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- TICKET DETAIL & ACTIVITY DRAWER -->
+  <aside id="detailDrawer" class="drawer hidden">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <span id="drawerTicketBadge" class="ticket-badge">INC-0000</span>
+        <span id="drawerPriorityBadge" class="priority-badge p-P3">P3</span>
+        <span id="drawerSlaBadge" class="sla-pill">SLA OK</span>
+      </div>
+      <div class="drawer-header-btns">
+        <button id="deleteTaskBtn" class="btn-icon btn-danger-ghost" title="Elimina Ticket">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+        <button id="closeDrawerBtn" class="btn-icon" title="Chiudi pannello">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <input type="text" id="drawerTitleInput" class="drawer-title-input" placeholder="Titolo del ticket..." />
+        <textarea id="drawerDescInput" class="drawer-desc-input" rows="3" placeholder="Descrizione tecnica del problema o richiesta..."></textarea>
+
+        <div class="drawer-meta-grid">
+          <div class="meta-field">
+            <label>Stato Ticket</label>
+            <select id="drawerStatusSelect">
+              <option value="todo">Da fare</option>
+              <option value="in_progress">In lavorazione</option>
+              <option value="waiting">In attesa utente/fornitore</option>
+              <option value="resolved">Risolto</option>
+            </select>
+          </div>
+          <div class="meta-field">
+            <label>Priorità SLA</label>
+            <select id="drawerPrioritySelect">
+              <option value="P1">P1 - Critico (1h)</option>
+              <option value="P2">P2 - Alto (4h)</option>
+              <option value="P3">P3 - Normale (8h)</option>
+              <option value="P4">P4 - Basso (24h)</option>
+            </select>
+          </div>
+          <div class="meta-field">
+            <label>Categoria</label>
+            <select id="drawerCategorySelect">
+              <option value="Hardware">💻 Hardware</option>
+              <option value="Software">🧩 Software / ERP</option>
+              <option value="Rete">🌐 Rete / VPN</option>
+              <option value="Account">🔐 Account / AD</option>
+              <option value="Altro">📋 Altro</option>
+            </select>
+          </div>
+          <div class="meta-field">
+            <label>ID Ticket</label>
+            <input type="text" id="drawerTicketIdInput" />
+          </div>
+          <div class="meta-field">
+            <label>Utente Richiedente</label>
+            <input type="text" id="drawerRequesterInput" placeholder="Nome e Cognome" />
+          </div>
+          <div class="meta-field">
+            <label>Reparto / Sede</label>
+            <input type="text" id="drawerDeptInput" placeholder="es. Amministrazione" />
+          </div>
+        </div>
+        <div class="drawer-save-bar">
+          <button id="saveDrawerChangesBtn" class="btn btn-primary btn-sm">Salva Modifiche Scheda</button>
+          <span id="drawerSaveFeedback" class="save-feedback"></span>
+        </div>
+      </div>
+
+      <div class="drawer-section timer-box">
+        <div class="timer-box-left">
+          <span class="timer-box-label">Tempo Lavorato sul Ticket</span>
+          <div id="drawerTimerDisplay" class="timer-box-clock mono-clock">00:00:00</div>
+        </div>
+        <div class="timer-box-actions">
+          <button id="drawerTimerToggleBtn" class="btn btn-sm btn-success">▶ Avvia Timer</button>
+          <button class="btn btn-xs btn-secondary add-manual-time" data-mins="15" title="Aggiungi 15 minuti">+15m</button>
+          <button class="btn btn-xs btn-secondary add-manual-time" data-mins="30" title="Aggiungi 30 minuti">+30m</button>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <div class="section-header-inline">
+          <h3>Note Operatore &amp; Risposte Standard</h3>
+          <select id="drawerTemplateSelect" class="select-sm">
+            <option value="">⚡ Inserisci Risposta Rapida...</option>
+          </select>
+        </div>
+        <div class="note-composer">
+          <textarea id="newNoteTextarea" rows="4" placeholder="Scrivi un appunto tecnico, un log di chiamata o compila un template da copiare per l'utente..."></textarea>
+          <div class="note-composer-actions">
+            <button id="copyNoteTextBtn" class="btn btn-xs btn-secondary" title="Copia testo negli appunti">
+              📋 Copia Testo negli Appunti
+            </button>
+            <button id="addNoteBtn" class="btn btn-sm btn-primary">
+              + Registra nel Diario Ticket
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <h3>Cronologia Attività Ticket</h3>
+        <div id="drawerLogsList" class="logs-timeline"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MODAL: NEW TASK -->
+  <div id="newTaskModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Nuovo Ticket / Task Giornaliero</h2>
+        <button class="btn-icon close-modal" data-target="newTaskModal">✕</button>
+      </div>
+      <form id="newTaskForm" class="modal-body">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>ID Ticket (opzionale, auto-generato se vuoto)</label>
+            <input type="text" name="ticket_id" placeholder="es. INC-4095 o SRQ-1200" />
+          </div>
+          <div class="form-group">
+            <label>Priorità &amp; SLA</label>
+            <select name="priority" id="newTaskPriority">
+              <option value="P1">🔥 P1 - Critico (SLA 1 ora)</option>
+              <option value="P2">⚡ P2 - Alto (SLA 4 ore)</option>
+              <option value="P3" selected>📌 P3 - Normale (SLA 8 ore)</option>
+              <option value="P4">🌱 P4 - Basso (SLA 24 ore)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Oggetto / Problema Segnalato *</label>
+          <input type="text" name="title" required placeholder="es. Stampante di rete bloccata / Errore VPN..." />
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-group">
+            <label>Categoria</label>
+            <select name="category">
+              <option value="Software">🧩 Software / ERP</option>
+              <option value="Hardware">💻 Hardware</option>
+              <option value="Rete">🌐 Rete / VPN</option>
+              <option value="Account">🔐 Account / AD</option>
+              <option value="Altro">📋 Altro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Utente Richiedente</label>
+            <input type="text" name="requester_name" placeholder="es. Mario Rossi" />
+          </div>
+          <div class="form-group">
+            <label>Reparto / Ufficio</label>
+            <input type="text" name="requester_dept" placeholder="es. Logistica" />
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Stato Iniziale</label>
+            <select name="status">
+              <option value="todo" selected>Da fare</option>
+              <option value="in_progress">In lavorazione (avvia subito)</option>
+              <option value="waiting">In attesa utente/fornitore</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Scadenza SLA (minuti personalizzati)</label>
+            <input type="number" name="sla_minutes" id="newTaskSlaMinutes" value="480" min="5" step="5" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Dettagli Tecnici / Note Iniziali</label>
+          <textarea name="description" rows="3" placeholder="Dettagli errore, IP macchina, AnyDesk ID, recapito telefonico..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary close-modal" data-target="newTaskModal">Annulla</button>
+          <button type="submit" class="btn btn-primary">Crea Ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: QUICK TEMPLATES MANAGER -->
+  <div id="templatesModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2>Risposte Standard &amp; Template Help Desk</h2>
+        <button class="btn-icon close-modal" data-target="templatesModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="helper-text">
+          Usa i segnaposto <code>{utente}</code>, <code>{ticket}</code>, <code>{titolo}</code>, <code>{priorita}</code>: verranno sostituiti automaticamente quando selezioni un template dentro un ticket.
+        </p>
+        <div id="templatesListContainer" class="templates-grid"></div>
+
+        <hr class="divider" />
+        <h3>Aggiungi Nuovo Template</h3>
+        <form id="newTemplateForm" class="template-form">
+          <div class="form-row-2">
+            <input type="text" name="title" required placeholder="Titolo template (es. Configurazione Posta)" />
+            <select name="category">
+              <option value="Generale">Generale</option>
+              <option value="Account">Account / AD</option>
+              <option value="Rete">Rete / VPN</option>
+              <option value="Software">Software</option>
+              <option value="Hardware">Hardware</option>
+            </select>
+          </div>
+          <textarea name="content" rows="3" required placeholder="Testo della risposta... Usa {utente} e {ticket} per compilazione dinamica."></textarea>
+          <button type="submit" class="btn btn-primary btn-sm">+ Salva Nuovo Template</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: END OF DAY REPORT -->
+  <div id="reportModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2>Riepilogo &amp; Esportazione Fine Giornata</h2>
+        <button class="btn-icon close-modal" data-target="reportModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="reportSummaryMetrics" class="report-metrics"></div>
+        <div class="form-group">
+          <label>Report Testuale Giornaliero (pronto per email di passaggio consegne / report turno)</label>
+          <textarea id="reportMarkdownOutput" rows="12" readonly class="mono-textarea"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button id="exportCsvBtn" class="btn btn-secondary">⬇ Scarica CSV (Excel)</button>
+          <button id="copyReportBtn" class="btn btn-primary">📋 Copia Report Fine Turno</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
