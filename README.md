@@ -20,6 +20,6 @@ Non richiede librerie esterne (usa esclusivamente la libreria standard di **Pyth
 python3 server.py
 ```
 
-Poi apri il browser su: **[http://127.0.0.1:8765](http://127.0.0.1:8765)**
+
 
 Su macOS puoi anche fare doppio clic su `start.command`.
